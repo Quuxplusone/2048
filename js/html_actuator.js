@@ -62,7 +62,10 @@ HTMLActuator.prototype.addTile = function (tile) {
   this.applyClasses(wrapper, classes);
 
   inner.classList.add("tile-inner");
-  inner.textContent = tile.value;
+  inner.innerHTML =
+      (tile.type === 'number') ? (tile.value) :
+      (tile.type === 'root') ? (tile.value === 2 ? '√' : '<sup>'+tile.value+'</sup>√') :
+      (tile.type === 'multiply') ? ('×' + tile.value) : 'X';
 
   if (tile.previousPosition) {
     // Make sure that the tile gets rendered in the previous position first
@@ -104,6 +107,7 @@ HTMLActuator.prototype.positionClass = function (position) {
 };
 
 HTMLActuator.prototype.appearanceClasses = function (tile) {
+  if (tile.type !== 'number') return [];
   if (tile.value > 2048) {
     return ["tile-super"];
   } else if (tile.value == 2048) {

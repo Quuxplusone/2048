@@ -20,7 +20,7 @@ GameManager.prototype.restart = function () {
   this.setup();
 };
 
-// Keep playing after winning (allows going over 2048)
+// Keep playing after winning (allows going over 32768)
 GameManager.prototype.keepPlaying = function () {
   this.keepPlaying = true;
   this.actuator.continueGame(); // Clear the game won/lost message
@@ -68,8 +68,9 @@ GameManager.prototype.addStartTiles = function () {
 // Adds a tile in a random position
 GameManager.prototype.addRandomTile = function () {
   if (this.grid.cellsAvailable()) {
-    var value = Math.random() < 0.9 ? 2 : 4;
-    var tile = new Tile(this.grid.randomAvailableCell(), value);
+    var type = (Math.random() < 0.8) ? 'number' : (Math.random() < 0.4) ? 'multiply' : 'root';
+    var value = (type === 'root') ? 2 : (Math.random() < 0.9) ? 2 : 4;
+    var tile = new Tile(this.grid.randomAvailableCell(), type, value);
 
     this.grid.insertTile(tile);
   }
@@ -126,9 +127,54 @@ GameManager.prototype.moveTile = function (tile, cell) {
   tile.updatePosition(cell);
 };
 
+GameManager.prototype.isSquare = function (x) {
+  if (x <= 0) return false;
+  var s = Math.sqrt(x);
+  return (s === Math.floor(s));
+}
+
+GameManager.prototype.isNthPower = function (n, x) {
+  if (x <= 0) return false;
+  var s = Math.pow(x, 1/n);
+  return (s === Math.round(s));
+}
+
+GameManager.prototype.log2 = function (x) {
+  return Math.round(Math.log(x) / Math.log(2));
+}
+
 GameManager.prototype.resultOfMerging = function (from, to) {
-  if (from.value !== to.value) return null;
-  return new Tile(null, from.value * 2);
+  var t = null;
+  if (to.type === 'multiply') {
+    if (from.type === 'multiply' && from.value === to.value) {
+      t = new Tile(null, 'multiply', from.value * to.value);
+      t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore + t.score);
+    }
+  } else if (to.type === 'root') {
+    if (from.type === 'root' && from.value === to.value) {
+      t = new Tile(null, 'root', from.value + to.value);
+      t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore + t.score);
+    }
+  } else if (to.type === 'number') {
+    if (from.type === 'multiply') {
+      t = new Tile(null, 'number', from.value * to.value);
+      t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore + t.score);
+    } else if (from.type === 'root' && this.isNthPower(from.value, to.value)) {
+      t = new Tile(null, 'number', Math.round(Math.pow(to.value, 1/from.value)));
+      t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore);
+      // Suppose the new value is 2^n. Then building that value out of 4's would
+      // earn us 2^n + 2*(2^(n-1)) + 4*(2^(n-2)) + ... + (2^(n-3))*(2^3) points.
+      var n = this.log2(t.value);
+      var newAccumulatedScore = Math.max(0, (1 << n) * (n-2));
+      newAccumulatedScore = Math.min(newAccumulatedScore, t.accumulatedScore);
+      t.score = (newAccumulatedScore - t.accumulatedScore);
+      t.accumulatedScore = newAccumulatedScore;
+    } else if (from.type === 'number' && from.value === to.value) {
+      t = new Tile(null, 'number', from.value + to.value);
+      t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore + t.score);
+    }
+  }
+  return t;
 };
 
 // Move tiles on the grid in the specified direction
@@ -173,10 +219,10 @@ GameManager.prototype.move = function (direction) {
           tile.updatePosition(positions.next);
 
           // Update the score
-          self.score += merged.value;
+          self.score += merged.score;
 
-          // The mighty 2048 tile
-          if (merged.value === 2048) self.won = true;
+          // Win at 32768, not 2048 (as in "Advanced 2048")
+          if (merged.type === 'number' && merged.value >= 32768) self.won = true;
         } else {
           self.moveTile(tile, positions.farthest);
         }
