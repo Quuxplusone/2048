@@ -61,11 +61,17 @@ HTMLActuator.prototype.addTile = function (tile) {
 
   this.applyClasses(wrapper, classes);
 
+  var D = function(x) {
+    if (x <= 99999) return x;
+    var log2_x = Math.round(Math.log(x) / Math.log(2));
+    return '2<sup>' + log2_x + '</sup>';
+  }
+
   inner.classList.add("tile-inner");
   inner.innerHTML =
-      (tile.type === 'number') ? (tile.value) :
-      (tile.type === 'root') ? (tile.value === 2 ? '√' : '<sup>'+tile.value+'</sup>√') :
-      (tile.type === 'multiply') ? ('×' + tile.value) : 'X';
+      (tile.type === 'number') ? D(tile.value) :
+      (tile.type === 'root') ? (tile.value === 2 ? '√' : '<sup>'+D(tile.value)+'</sup>√') :
+      (tile.type === 'multiply') ? ('×' + D(tile.value)) : 'X';
 
   if (tile.previousPosition) {
     // Make sure that the tile gets rendered in the previous position first
@@ -106,19 +112,45 @@ HTMLActuator.prototype.positionClass = function (position) {
   return "tile-position-" + position.x + "-" + position.y;
 };
 
-HTMLActuator.prototype.appearanceClasses = function (tile) {
-  if (tile.type !== 'number') return [];
+HTMLActuator.prototype.valueClass = function (tile) {
   if (tile.value > 2048) {
-    return ["tile-super"];
+    return "tile-super";
   } else if (tile.value == 2048) {
-    return ["tile-2048"];
+    return "tile-2048";
   } else if (tile.value >= 1000) {
     // The only such tile in this version is 1024, but the default styling
     // doesn't work for four-digit numbers, so give all four-digit numbers
     // this style in order to help people writing their own mods.
-    return ["tile-1024"];
+    return "tile-1024";
   } else {
-    return ["tile-" + tile.value];
+    return "tile-" + tile.value;
+  }
+};
+
+HTMLActuator.prototype.digitsIn = function (value) {
+  return Math.ceil(Math.log(value+1) / Math.log(10));
+};
+
+HTMLActuator.prototype.digitsClass = function (value, plus) {
+  if (value <= 99999) {
+    return "tile-" + (plus + this.digitsIn(value)) + "-digits";
+  } else {
+    // Such a large value will be displayed as 2<sup>N</sup>.
+    // This recursive formula isn't correct for numbers above 2^9999, but that's probably okay.
+    var log2_value = Math.round(Math.log(value) / Math.log(2));
+    return this.digitsClass(log2_value, plus+1);
+  }
+};
+
+HTMLActuator.prototype.appearanceClasses = function (tile) {
+  if (tile.type === 'number') {
+    return [this.valueClass(tile), this.digitsClass(tile.value, 0)];
+  } else if (tile.type === 'root') {
+    return [this.digitsClass(tile.value, 1)];
+  } else if (tile.type === 'multiply') {
+    return [this.digitsClass(tile.value, 1)];
+  } else {
+    return [];
   }
 };
 
