@@ -37,6 +37,7 @@ GameManager.prototype.setup = function () {
 
   // Reload the game from a previous game if present
   if (previousState) {
+    mixpanel.track("Load previous state", { score: previousState.score, hour: (new Date()).getHours() });
     this.grid        = new Grid(previousState.grid.size,
                                 previousState.grid.cells); // Reload grid
     this.score       = previousState.score;
@@ -44,6 +45,7 @@ GameManager.prototype.setup = function () {
     this.won         = previousState.won;
     this.keepPlaying = previousState.keepPlaying;
   } else {
+    mixpanel.track("New game", { score: 0, hour: (new Date()).getHours() });
     this.grid        = new Grid(this.size);
     this.score       = 0;
     this.over        = false;
@@ -73,6 +75,7 @@ GameManager.prototype.addRandomTile = function () {
     var tile = new Tile(this.grid.randomAvailableCell(), type, value);
 
     this.grid.insertTile(tile);
+    mixpanel.track('Add tile', { type: type, value: value, hour: (new Date()).getHours() });
   }
 };
 
@@ -215,8 +218,16 @@ GameManager.prototype.move = function (direction) {
           // Update the score
           self.score += merged.score;
 
+          var bestScore = self.storageManager.getBestScore();
+          mixpanel.track("Merge tile", { score: this.score, bestScore: bestScore, type: merged.type, value: merged.value, scoreDelta: merged.score, hour: (new Date()).getHours() });
+
           // Win at 32768, not 2048 (as in "Advanced 2048")
-          if (merged.type === 'number' && merged.value >= 32768) self.won = true;
+          if (merged.type === 'number' && merged.value >= 32768) {
+            if (!self.won) {
+              mixpanel.track("Win the game", { score: this.score, bestScore: bestScore, hour: (new Date()).getHours() });
+            }
+            self.won = true;
+          }
         } else {
           self.moveTile(tile, positions.farthest);
         }
