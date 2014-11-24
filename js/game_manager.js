@@ -153,7 +153,7 @@ GameManager.prototype.move = function (direction) {
       cell = { x: x, y: y };
       tile = self.grid.cellContent(cell);
 
-      if (tile) {
+      if (tile && !tile.is_heavy) {
         var positions = self.findFarthestPosition(cell, vector);
         var next      = self.grid.cellContent(positions.next);
 
@@ -190,6 +190,28 @@ GameManager.prototype.move = function (direction) {
 
   if (moved) {
     this.addRandomTile();
+
+    var maxValue = 0;
+    var someoneIsHeavy = false;
+    var uniqueMaxValue = false;
+    this.grid.eachCell(function (x, y, tile) {
+      if (tile) {
+        someoneIsHeavy = (someoneIsHeavy || tile.is_heavy);
+        if (tile.value == maxValue) {
+          uniqueMaxValue = false;
+        } else if (tile.value > maxValue) {
+          uniqueMaxValue = true;
+          maxValue = tile.value;
+        }
+      }
+    });
+    if (uniqueMaxValue && !someoneIsHeavy) {
+      this.grid.eachCell(function (x, y, tile) {
+        if (tile && (maxValue == tile.value)) {
+          tile.is_heavy = true;
+        }
+      });
+    }
 
     if (!this.movesAvailable()) {
       this.over = true; // Game over!
@@ -258,7 +280,7 @@ GameManager.prototype.tileMatchesAvailable = function () {
     for (var y = 0; y < this.size; y++) {
       tile = this.grid.cellContent({ x: x, y: y });
 
-      if (tile) {
+      if (tile && !tile.is_heavy) {
         for (var direction = 0; direction < 4; direction++) {
           var vector = self.getVector(direction);
           var cell   = { x: x + vector.x, y: y + vector.y };

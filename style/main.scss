@@ -412,6 +412,12 @@ hr {
       font-size: 10px;
     }
   }
+
+  &.tile-heavy .tile-inner {
+    color: white;
+    background: black;
+    font-weight: bold;
+  }
 }
 
 @include keyframes(appear) {

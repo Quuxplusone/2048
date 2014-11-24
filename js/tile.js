@@ -3,6 +3,7 @@ function Tile(position, value) {
   this.x                = position ? position.x : null;
   this.y                = position ? position.y : null;
   this.value            = value;
+  this.is_heavy         = false;
 
   this.previousPosition = null;
   this.mergedFrom       = null; // Tracks tiles that merged together
@@ -23,6 +24,7 @@ Tile.prototype.serialize = function () {
       x: this.x,
       y: this.y
     },
-    value: this.value
+    value: this.value,
+    is_heavy: this.is_heavy
   };
 };

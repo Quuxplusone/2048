@@ -56,6 +56,10 @@ HTMLActuator.prototype.addTile = function (tile) {
 
   var appearanceClasses = this.appearanceClasses(tile);
 
+  if (tile.is_heavy) {
+    appearanceClasses = appearanceClasses.concat(["tile-heavy"]);
+  }
+
   // We can't use classlist because it somehow glitches when replacing classes
   var classes = ["tile", positionClass].concat(appearanceClasses);
 
