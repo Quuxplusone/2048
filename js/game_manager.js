@@ -43,12 +43,14 @@ GameManager.prototype.setup = function () {
     this.over        = previousState.over;
     this.won         = previousState.won;
     this.keepPlaying = previousState.keepPlaying;
+    this.heavyCountdown = previousState.heavyCountdown;
   } else {
     this.grid        = new Grid(this.size);
     this.score       = 0;
     this.over        = false;
     this.won         = false;
     this.keepPlaying = false;
+    this.heavyCountdown = 10;
 
     // Add the initial tiles
     this.addStartTiles();
@@ -70,6 +72,13 @@ GameManager.prototype.addRandomTile = function () {
   if (this.grid.cellsAvailable()) {
     var value = Math.random() < 0.9 ? 2 : 4;
     var tile = new Tile(this.grid.randomAvailableCell(), value);
+
+    if (this.heavyCountdown == 0 && Math.random() < 0.1) {
+      value = 16;
+      while (value < 512 && Math.random() < 0.5) value *= 2;
+      tile.value = value;
+      tile.is_heavy = true;
+    }
 
     this.grid.insertTile(tile);
   }
@@ -105,7 +114,8 @@ GameManager.prototype.serialize = function () {
     score:       this.score,
     over:        this.over,
     won:         this.won,
-    keepPlaying: this.keepPlaying
+    keepPlaying: this.keepPlaying,
+    heavyCountdown: this.heavyCountdown
   };
 };
 
@@ -189,29 +199,22 @@ GameManager.prototype.move = function (direction) {
   });
 
   if (moved) {
-    this.addRandomTile();
-
-    var maxValue = 0;
     var someoneIsHeavy = false;
-    var uniqueMaxValue = false;
     this.grid.eachCell(function (x, y, tile) {
       if (tile) {
         someoneIsHeavy = (someoneIsHeavy || tile.is_heavy);
-        if (tile.value == maxValue) {
-          uniqueMaxValue = false;
-        } else if (tile.value > maxValue) {
-          uniqueMaxValue = true;
-          maxValue = tile.value;
-        }
       }
     });
-    if (uniqueMaxValue && !someoneIsHeavy) {
-      this.grid.eachCell(function (x, y, tile) {
-        if (tile && (maxValue == tile.value)) {
-          tile.is_heavy = true;
-        }
-      });
+
+    if (someoneIsHeavy) {
+      this.heavyCountdown = 10;
+    } else {
+      if (this.heavyCountdown > 0) {
+        this.heavyCountdown -= 1;
+      }
     }
+
+    this.addRandomTile();
 
     if (!this.movesAvailable()) {
       this.over = true; // Game over!
