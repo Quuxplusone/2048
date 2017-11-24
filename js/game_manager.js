@@ -68,8 +68,8 @@ GameManager.prototype.addStartTiles = function () {
 // Adds a tile in a random position
 GameManager.prototype.addRandomTile = function () {
   if (this.grid.cellsAvailable()) {
-    var type = (Math.random() < 0.8) ? 'number' : (Math.random() < 0.4) ? 'multiply' : 'root';
-    var value = (type === 'root') ? 2 : (Math.random() < 0.9) ? 2 : 4;
+    var type = (Math.random() < 0.8) ? 'number' : (Math.random() < 0.3) ? 'multiply' : (Math.random() < 0.5) ? 'log' : 'root';
+    var value = (type === 'root' || type == 'log') ? 2 : (Math.random() < 0.9) ? 2 : 4;
     var tile = new Tile(this.grid.randomAvailableCell(), type, value);
 
     this.grid.insertTile(tile);
@@ -128,9 +128,21 @@ GameManager.prototype.moveTile = function (tile, cell) {
 };
 
 GameManager.prototype.isNthPower = function (n, x) {
-  if (x <= 0) return false;
+  if (x < 0) return false;
+  if (x == 0) return true;
   var s = Math.pow(x, 1/n);
   return (s === Math.round(s));
+}
+
+GameManager.prototype.nthRoot = function(n, x) {
+  if (x == 0) return 0;
+  return Math.round(Math.pow(x, 1/n));
+}
+
+GameManager.prototype.isPowerOf2 = function (x) {
+  if (x <= 0) return false;
+  var s = this.log2(x);
+  return (x == (1 << s));
 }
 
 GameManager.prototype.log2 = function (x) {
@@ -154,10 +166,18 @@ GameManager.prototype.resultOfMerging = function (from, to) {
       t = new Tile(null, 'number', from.value * to.value);
       t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore + t.score);
     } else if (from.type === 'root' && this.isNthPower(from.value, to.value)) {
-      t = new Tile(null, 'number', Math.round(Math.pow(to.value, 1/from.value)));
+      t = new Tile(null, 'number', this.nthRoot(from.value, to.value));
       t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore);
       // Suppose the new value is 2^n. Then building that value out of 4's would
       // earn us 2^n + 2*(2^(n-1)) + 4*(2^(n-2)) + ... + (2^(n-3))*(2^3) points.
+      var n = this.log2(t.value);
+      var newAccumulatedScore = Math.max(0, (1 << n) * (n-2));
+      newAccumulatedScore = Math.min(newAccumulatedScore, t.accumulatedScore);
+      t.score = (newAccumulatedScore - t.accumulatedScore);
+      t.accumulatedScore = newAccumulatedScore;
+    } else if (from.type == 'log' && this.isPowerOf2(to.value)) {
+      t = new Tile(null, 'number', this.log2(to.value));
+      // Use the same logic as above, even though this tile may not be a power of 2.
       var n = this.log2(t.value);
       var newAccumulatedScore = Math.max(0, (1 << n) * (n-2));
       newAccumulatedScore = Math.min(newAccumulatedScore, t.accumulatedScore);

@@ -71,6 +71,7 @@ HTMLActuator.prototype.addTile = function (tile) {
   inner.innerHTML =
       (tile.type === 'number') ? D(tile.value) :
       (tile.type === 'root') ? (tile.value === 2 ? '√' : '<sup>'+D(tile.value)+'</sup>√') :
+      (tile.type === 'log') ? ('log') :
       (tile.type === 'multiply') ? ('×' + D(tile.value)) : 'X';
 
   if (tile.previousPosition) {
@@ -146,6 +147,8 @@ HTMLActuator.prototype.appearanceClasses = function (tile) {
   if (tile.type === 'number') {
     return [this.valueClass(tile), this.digitsClass(tile.value, 0)];
   } else if (tile.type === 'root') {
+    return [this.digitsClass(tile.value, 1)];
+  } else if (tile.type === 'log') {
     return [this.digitsClass(tile.value, 1)];
   } else if (tile.type === 'multiply') {
     return [this.digitsClass(tile.value, 1)];
