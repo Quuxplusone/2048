@@ -127,12 +127,6 @@ GameManager.prototype.moveTile = function (tile, cell) {
   tile.updatePosition(cell);
 };
 
-GameManager.prototype.isSquare = function (x) {
-  if (x <= 0) return false;
-  var s = Math.sqrt(x);
-  return (s === Math.floor(s));
-}
-
 GameManager.prototype.isNthPower = function (n, x) {
   if (x <= 0) return false;
   var s = Math.pow(x, 1/n);
