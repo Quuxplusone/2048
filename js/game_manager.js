@@ -86,8 +86,8 @@ GameManager.prototype.addRandomTile = function (initial) {
              (Math.random() < 0.5) ? 'log' : 'root';
     } else if (this.version == 'sqrt') {
       type = (Math.random() < 0.8) ? 'number' :
-             (Math.random() < 0.3) ? 'multiply' :
-             (Math.random() < 0.5) ? 'log' : 'root';
+             (Math.random() < 0.4) ? 'multiply' :
+             'root';
     } else {
       type = 'number';
     }
