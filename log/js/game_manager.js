@@ -1,7 +1,8 @@
-function GameManager(size, InputManager, Actuator, StorageManager) {
-  this.size           = size; // Size of the grid
+function GameManager(version, InputManager, Actuator, StorageManager) {
+  this.version = version;
+  this.size           = 4; // Size of the grid
   this.inputManager   = new InputManager;
-  this.storageManager = new StorageManager('log');
+  this.storageManager = new StorageManager(version);
   this.actuator       = new Actuator;
 
   this.startTiles     = 2;
@@ -44,6 +45,9 @@ GameManager.prototype.setup = function () {
     this.over        = previousState.over;
     this.won         = previousState.won;
     this.keepPlaying = previousState.keepPlaying;
+    if (this.version == 'heavy') {
+      this.heavyCountdown = previousState.heavyCountdown;
+    }
   } else {
     mixpanel.track("New game", { score: 0, hour: (new Date()).getHours() });
     this.grid        = new Grid(this.size);
@@ -51,6 +55,9 @@ GameManager.prototype.setup = function () {
     this.over        = false;
     this.won         = false;
     this.keepPlaying = false;
+    if (this.version == 'heavy') {
+      this.heavyCountdown = 10;
+    }
 
     // Add the initial tiles
     this.addStartTiles();
@@ -63,19 +70,42 @@ GameManager.prototype.setup = function () {
 // Set up the initial tiles to start the game with
 GameManager.prototype.addStartTiles = function () {
   for (var i = 0; i < this.startTiles; i++) {
-    this.addRandomTile();
+    this.addRandomTile(true);
   }
 };
 
 // Adds a tile in a random position
-GameManager.prototype.addRandomTile = function () {
+GameManager.prototype.addRandomTile = function (initial) {
   if (this.grid.cellsAvailable()) {
-    var type = (Math.random() < 0.8) ? 'number' : (Math.random() < 0.3) ? 'multiply' : (Math.random() < 0.5) ? 'log' : 'root';
-    var value = (type == 'log') ? 0 : (type === 'root') ? 2 : (Math.random() < 0.9) ? 2 : 4;
-    var tile = new Tile(this.grid.randomAvailableCell(), type, value);
+    var type;
+    if (initial) {
+      type = 'number';
+    } else if (this.version == 'log') {
+      type = (Math.random() < 0.8) ? 'number' :
+             (Math.random() < 0.3) ? 'multiply' :
+             (Math.random() < 0.5) ? 'log' : 'root';
+    } else if (this.version == 'sqrt') {
+      type = (Math.random() < 0.8) ? 'number' :
+             (Math.random() < 0.3) ? 'multiply' :
+             (Math.random() < 0.5) ? 'log' : 'root';
+    } else {
+      type = 'number';
+    }
+    var value = (type == 'log') ? 0 :
+                (type === 'root') ? 2 :
+                (Math.random() < 0.9) ? 2 : 4;
+    var is_heavy = false;
+    if (this.version == 'heavy') {
+      if (this.heavyCountdown == 0 && Math.random() < 0.1) {
+        value = 16;
+        while (value < 512 && Math.random() < 0.5) value *= 2;
+        is_heavy = true;
+      }
+    }
 
+    var tile = new Tile(this.grid.randomAvailableCell(), type, value, is_heavy);
     this.grid.insertTile(tile);
-    mixpanel.track('Add tile', { type: type, value: value, hour: (new Date()).getHours() });
+    mixpanel.track('Add tile', { type: type, value: value, is_heavy: is_heavy, hour: (new Date()).getHours() });
   }
 };
 
@@ -109,7 +139,8 @@ GameManager.prototype.serialize = function () {
     score:       this.score,
     over:        this.over,
     won:         this.won,
-    keepPlaying: this.keepPlaying
+    keepPlaying: this.keepPlaying,
+    heavyCountdown: this.heavyCountdown,
   };
 };
 
@@ -169,20 +200,20 @@ GameManager.prototype.resultOfMerging = function (from, to) {
   var t = null;
   if (to.type === 'multiply') {
     if (from.type === 'multiply' && from.value === to.value) {
-      t = new Tile(null, 'multiply', from.value * to.value);
+      t = new Tile(null, 'multiply', from.value * to.value, false);
       t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore);
     }
   } else if (to.type === 'root') {
     if (from.type === 'root' && from.value === to.value) {
-      t = new Tile(null, 'root', from.value + to.value);
+      t = new Tile(null, 'root', from.value + to.value, false);
       t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore);
     }
   } else if (to.type === 'number') {
     if (from.type === 'multiply') {
-      t = new Tile(null, 'number', from.value * to.value);
+      t = new Tile(null, 'number', from.value * to.value, to.is_heavy);
       t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore);
     } else if (from.type === 'root' && this.isNthPower(from.value, to.value)) {
-      t = new Tile(null, 'number', this.nthRoot(from.value, to.value));
+      t = new Tile(null, 'number', this.nthRoot(from.value, to.value), to.is_heavy);
       t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore);
       t.score = this.synthesizedAccumulatedScore(t) - t.accumulatedScore;
     } else if (from.type == 'log' && this.isLoggable(to.value)) {
@@ -190,18 +221,17 @@ GameManager.prototype.resultOfMerging = function (from, to) {
       if (to.value == 0) {
         var value = 16;
         while (value < 512 && Math.random() < 0.5) value *= 2;
-        t = new Tile(null, 'number', value);
-        t.is_heavy = true;
+        t = new Tile(null, 'number', value, true);
         newAccumulatedScore = 0;
       } else {
-        t = new Tile(null, 'number', this.log2(to.value));
+        t = new Tile(null, 'number', this.log2(to.value), to.is_heavy);
         newAccumulatedScore = this.synthesizedAccumulatedScore(t);
       }
       t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore);
       t.score = newAccumulatedScore - t.accumulatedScore;
       t.accumulatedScore = newAccumulatedScore;
     } else if (from.type === 'number' && from.value === to.value) {
-      t = new Tile(null, 'number', from.value + to.value);
+      t = new Tile(null, 'number', from.value + to.value, false);
       t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore);
     }
   }
@@ -258,12 +288,15 @@ GameManager.prototype.move = function (direction) {
           var bestScore = self.storageManager.getBestScore();
           mixpanel.track("Merge tile", { score: this.score, bestScore: bestScore, type: merged.type, value: merged.value, scoreDelta: merged.score, hour: (new Date()).getHours() });
 
-          // Win at 32768, not 2048 (as in "Advanced 2048")
-          if (merged.type === 'number' && merged.value >= 32768) {
-            if (!self.won) {
+          if (!self.won) {
+            var winning_value = 2048;
+            if (this.version == 'log' || this.version == 'sqrt') {
+              winning_value = 32768;
+            }
+            if (merged.type === 'number' && merged.value >= winning_value) {
+              self.won = true;
               mixpanel.track("Win the game", { score: this.score, bestScore: bestScore, hour: (new Date()).getHours() });
             }
-            self.won = true;
           }
         } else {
           self.moveTile(tile, positions.farthest);
@@ -277,6 +310,19 @@ GameManager.prototype.move = function (direction) {
   });
 
   if (moved) {
+    if (this.version == 'heavy') {
+      var someoneIsHeavy = false;
+      this.grid.eachCell(function (x, y, tile) {
+        someoneIsHeavy = (someoneIsHeavy || (tile && tile.is_heavy));
+      });
+
+      if (someoneIsHeavy) {
+        this.heavyCountdown = 10;
+      } else if (this.heavyCountdown > 0) {
+        this.heavyCountdown -= 1;
+      }
+    }
+
     this.addRandomTile();
 
     if (!this.movesAvailable()) {
