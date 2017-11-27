@@ -32,7 +32,7 @@ html, body {
 }
 
 body {
-  margin: 80px 0;
+  margin: 20px 0;
 }
 
 // Styles for buttons
@@ -492,6 +492,9 @@ hr {
     color: white;
     background: sienna;
     font-weight: bold;
+  }
+  &.tile-cursor .tile-inner {
+    background-image: radial-gradient(circle at center, chartreuse 0%, black 20%, chartreuse 40%, black 60%);
   }
 }
 

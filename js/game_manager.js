@@ -5,8 +5,6 @@ function GameManager(version, InputManager, Actuator, StorageManager) {
   this.storageManager = new StorageManager(version);
   this.actuator       = new Actuator;
 
-  this.startTiles     = 2;
-
   this.inputManager.on("move", this.move.bind(this));
   this.inputManager.on("restart", this.restart.bind(this));
   this.inputManager.on("keepPlaying", this.keepPlaying.bind(this));
@@ -37,7 +35,7 @@ GameManager.prototype.setup = function () {
   var previousState = this.storageManager.getGameState();
 
   // Reload the game from a previous game if present
-  if (previousState) {
+  if (previousState && this.version !== 'home') {
     mixpanel.track("Load previous state", { score: previousState.score, hour: (new Date()).getHours() });
     this.grid        = new Grid(previousState.grid.size,
                                 previousState.grid.cells); // Reload grid
@@ -45,7 +43,7 @@ GameManager.prototype.setup = function () {
     this.over        = previousState.over;
     this.won         = previousState.won;
     this.keepPlaying = previousState.keepPlaying;
-    if (this.version == 'heavy') {
+    if (this.version === 'heavy') {
       this.heavyCountdown = previousState.heavyCountdown;
     }
   } else {
@@ -55,7 +53,7 @@ GameManager.prototype.setup = function () {
     this.over        = false;
     this.won         = false;
     this.keepPlaying = false;
-    if (this.version == 'heavy') {
+    if (this.version === 'heavy') {
       this.heavyCountdown = 10;
     }
 
@@ -69,8 +67,16 @@ GameManager.prototype.setup = function () {
 
 // Set up the initial tiles to start the game with
 GameManager.prototype.addStartTiles = function () {
-  for (var i = 0; i < this.startTiles; i++) {
-    this.addRandomTile(true);
+  if (this.version === 'home') {
+    this.grid.insertTile(new Tile({x: 1, y: 1}, 'cursor', 0, false));
+    this.grid.insertTile(new Tile({x: 2, y: 3}, 'root', 2, false));
+    this.grid.insertTile(new Tile({x: 3, y: 3}, 'log', 0, false));
+    this.grid.insertTile(new Tile({x: 3, y: 1}, 'number', 512, true));
+    this.grid.insertTile(new Tile({x: 1, y: 2}, 'number', 2, false));
+  } else {
+    for (var i = 0; i < 2; i++) {
+      this.addRandomTile(true);
+    }
   }
 };
 
@@ -80,23 +86,23 @@ GameManager.prototype.addRandomTile = function (initial) {
     var type;
     if (initial) {
       type = 'number';
-    } else if (this.version == 'log') {
+    } else if (this.version === 'log') {
       type = (Math.random() < 0.8) ? 'number' :
              (Math.random() < 0.3) ? 'multiply' :
              (Math.random() < 0.5) ? 'log' : 'root';
-    } else if (this.version == 'sqrt') {
+    } else if (this.version === 'sqrt') {
       type = (Math.random() < 0.8) ? 'number' :
              (Math.random() < 0.4) ? 'multiply' :
              'root';
     } else {
       type = 'number';
     }
-    var value = (type == 'log') ? 0 :
+    var value = (type === 'log') ? 0 :
                 (type === 'root') ? 2 :
                 (Math.random() < 0.9) ? 2 : 4;
     var is_heavy = false;
-    if (this.version == 'heavy') {
-      if (this.heavyCountdown == 0 && Math.random() < 0.1) {
+    if (this.version === 'heavy') {
+      if (this.heavyCountdown === 0 && Math.random() < 0.1) {
         value = 16;
         while (value < 512 && Math.random() < 0.5) value *= 2;
         is_heavy = true;
@@ -163,20 +169,20 @@ GameManager.prototype.moveTile = function (tile, cell) {
 
 GameManager.prototype.isNthPower = function (n, x) {
   if (x < 0) return false;
-  if (x == 0) return true;
+  if (x === 0) return true;
   var s = Math.pow(x, 1/n);
   return (s === Math.round(s));
 };
 
 GameManager.prototype.nthRoot = function (n, x) {
-  if (x == 0) return 0;
+  if (x === 0) return 0;
   return Math.round(Math.pow(x, 1/n));
 };
 
 GameManager.prototype.isPowerOf2 = function (x) {
   if (x <= 0) return false;
   var s = this.log2(x);
-  return (x == (1 << s));
+  return (x === (1 << s));
 };
 
 GameManager.prototype.isLoggable = function (x) {
@@ -199,26 +205,36 @@ GameManager.prototype.synthesizedAccumulatedScore = function (t) {
 GameManager.prototype.resultOfMerging = function (from, to) {
   var t = null;
   if (to.type === 'multiply') {
-    if (from.type === 'multiply' && from.value === to.value) {
+    if (from.type === 'cursor') {
+      t = new Tile(null, 'number', 2048, false);
+    } else if (from.type === 'multiply' && from.value === to.value) {
       t = new Tile(null, 'multiply', from.value * to.value, false);
       t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore);
     }
+  } else if (to.type === 'log') {
+    if (from.type === 'cursor') {
+      t = new Tile(null, 'number', 2048, false);
+    }
   } else if (to.type === 'root') {
-    if (from.type === 'root' && from.value === to.value) {
+    if (from.type === 'cursor') {
+      t = new Tile(null, 'number', 2048, false);
+    } else if (from.type === 'root' && from.value === to.value) {
       t = new Tile(null, 'root', from.value + to.value, false);
       t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore);
     }
   } else if (to.type === 'number') {
-    if (from.type === 'multiply') {
+    if (from.type === 'cursor') {
+      t = new Tile(null, 'number', 2048, false);
+    } else if (from.type === 'multiply') {
       t = new Tile(null, 'number', from.value * to.value, to.is_heavy);
       t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore);
     } else if (from.type === 'root' && this.isNthPower(from.value, to.value)) {
       t = new Tile(null, 'number', this.nthRoot(from.value, to.value), to.is_heavy);
       t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore);
       t.score = this.synthesizedAccumulatedScore(t) - t.accumulatedScore;
-    } else if (from.type == 'log' && this.isLoggable(to.value)) {
+    } else if (from.type === 'log' && this.isLoggable(to.value)) {
       var newAccumulatedScore;
-      if (to.value == 0) {
+      if (to.value === 0) {
         var value = 16;
         while (value < 512 && Math.random() < 0.5) value *= 2;
         t = new Tile(null, 'number', value, true);
@@ -250,9 +266,10 @@ GameManager.prototype.move = function (direction) {
 
   var cell, tile;
 
-  var vector     = this.getVector(direction);
-  var traversals = this.buildTraversals(vector);
-  var moved      = false;
+  var vector      = this.getVector(direction);
+  var traversals  = this.buildTraversals(vector);
+  var moved       = false;
+  var destination = null;
 
   // Save the current tile positions and remove merger information
   this.prepareTiles();
@@ -286,16 +303,25 @@ GameManager.prototype.move = function (direction) {
           self.score += merged.score;
 
           var bestScore = self.storageManager.getBestScore();
-          mixpanel.track("Merge tile", { score: this.score, bestScore: bestScore, type: merged.type, value: merged.value, scoreDelta: merged.score, hour: (new Date()).getHours() });
+          mixpanel.track("Merge tile", { score: self.score, bestScore: bestScore, type: merged.type, value: merged.value, scoreDelta: merged.score, hour: (new Date()).getHours() });
 
           if (!self.won) {
             var winning_value = 2048;
-            if (this.version == 'log' || this.version == 'sqrt') {
+            if (self.version === 'log' || self.version === 'sqrt' || self.version === 'home') {
               winning_value = 32768;
             }
             if (merged.type === 'number' && merged.value >= winning_value) {
               self.won = true;
-              mixpanel.track("Win the game", { score: this.score, bestScore: bestScore, hour: (new Date()).getHours() });
+              mixpanel.track("Win the game", { score: self.score, bestScore: bestScore, hour: (new Date()).getHours() });
+            }
+          }
+
+          if (self.version === 'home') {
+            if (tile.type === 'cursor') {
+              destination = (next.type === 'log') ? 'log.html' :
+                            (next.type === 'root') ? 'sqrt.html' :
+                            (next.is_heavy) ? 'heavy.html' :
+                            'original.html';
             }
           }
         } else {
@@ -310,7 +336,7 @@ GameManager.prototype.move = function (direction) {
   });
 
   if (moved) {
-    if (this.version == 'heavy') {
+    if (this.version === 'heavy') {
       var someoneIsHeavy = false;
       this.grid.eachCell(function (x, y, tile) {
         someoneIsHeavy = (someoneIsHeavy || (tile && tile.is_heavy));
@@ -323,13 +349,20 @@ GameManager.prototype.move = function (direction) {
       }
     }
 
-    this.addRandomTile();
+    if (this.version !== 'home') {
+      this.addRandomTile();
+    }
 
     if (!this.movesAvailable()) {
       this.over = true; // Game over!
     }
 
     this.actuate();
+  }
+  if (destination) {
+    window.setTimeout(function () {
+      window.location.href = destination;
+    }, 500);
   }
 };
 

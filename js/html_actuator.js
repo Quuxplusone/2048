@@ -59,6 +59,9 @@ HTMLActuator.prototype.addTile = function (tile) {
   if (tile.is_heavy) {
     appearanceClasses = appearanceClasses.concat(["tile-heavy"]);
   }
+  if (tile.type === 'cursor') {
+    appearanceClasses = appearanceClasses.concat(["tile-cursor"]);
+  }
 
   // We can't use classlist because it somehow glitches when replacing classes
   var classes = ["tile", positionClass].concat(appearanceClasses);
@@ -76,7 +79,9 @@ HTMLActuator.prototype.addTile = function (tile) {
       (tile.type === 'number') ? D(tile.value) :
       (tile.type === 'root') ? (tile.value === 2 ? '√' : '<sup>'+D(tile.value)+'</sup>√') :
       (tile.type === 'log') ? ('log') :
-      (tile.type === 'multiply') ? ('×' + D(tile.value)) : 'X';
+      (tile.type === 'multiply') ? ('×' + D(tile.value)) :
+      (tile.type === 'cursor') ? ('') :
+      'X';
 
   if (tile.previousPosition) {
     // Make sure that the tile gets rendered in the previous position first
