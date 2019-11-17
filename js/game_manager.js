@@ -167,11 +167,22 @@ GameManager.prototype.moveTile = function (tile, cell) {
   tile.updatePosition(cell);
 };
 
-GameManager.prototype.isNthPower = function (n, x) {
+GameManager.prototype.isPowerOf2 = function (x) {
+  if (x <= 0) return false;
+  var s = this.log2(x);
+  return (x === Math.pow(2, s));
+};
+
+GameManager.prototype.isNthRootable = function (n, x) {
   if (x < 0) return false;
   if (x === 0) return true;
-  var s = Math.pow(x, 1/n);
-  return (s === Math.round(s));
+  if (this.isPowerOf2(x)) {
+    var log2_x = this.log2(x);
+    return log2_x % n == 0;
+  } else {
+    var s = Math.pow(x, 1/n);
+    return (s === Math.round(s));
+  }
 };
 
 GameManager.prototype.nthRoot = function (n, x) {
@@ -179,15 +190,12 @@ GameManager.prototype.nthRoot = function (n, x) {
   return Math.round(Math.pow(x, 1/n));
 };
 
-GameManager.prototype.isPowerOf2 = function (x) {
-  if (x <= 0) return false;
-  var s = this.log2(x);
-  return (x === (1 << s));
-};
-
 GameManager.prototype.isLoggable = function (x) {
   if (x <= 1) return true;
-  return this.isPowerOf2(this.log2(x));
+  var log2_x = this.log2(x);
+  // The tile is loggable only if log2(x) is itself a power of 2.
+  var log2_log2_x = this.log2(log2_x);
+  return (log2_x === Math.pow(2, log2_log2_x));
 };
 
 GameManager.prototype.log2 = function (x) {
@@ -228,7 +236,7 @@ GameManager.prototype.resultOfMerging = function (from, to) {
     } else if (from.type === 'multiply') {
       t = new Tile(null, 'number', from.value * to.value, to.is_heavy);
       t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore);
-    } else if (from.type === 'root' && this.isNthPower(from.value, to.value)) {
+    } else if (from.type === 'root' && this.isNthRootable(from.value, to.value)) {
       t = new Tile(null, 'number', this.nthRoot(from.value, to.value), to.is_heavy);
       t.accumulatedScore = (from.accumulatedScore + to.accumulatedScore);
       t.score = this.synthesizedAccumulatedScore(t) - t.accumulatedScore;
